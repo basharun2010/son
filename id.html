@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentria | Kur veya Katıl</title>
+    <link rel="stylesheet" href="id.css">
+</head>
+<body>
+    <div class="id-wrapper">
+        <div class="id-card">
+            <h1>Cihaz Bağlantısı</h1>
+            <p>8 haneli kodu girerek sistemi başlatın.</p>
+            <input type="text" id="joinCodeInput" placeholder="8 Haneli Kod" maxlength="8">
+            <div class="button-group">
+                <button onclick="evKur()" class="btn-kur">Evi Kur</button>
+                <button onclick="eveKatil()" class="btn-katil">Eve Katıl</button>
+            </div>
+            <button onclick="cikis()" class="btn-sub">Çıkış Yap</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYjvyL6Bs-2Rm91mq1c6_WmHrZ-4GbZJU",
+            authDomain: "teknofest2026-54c0d.firebaseapp.com",
+            databaseURL: "https://teknofest2026-54c0d-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "teknofest2026-54c0d",
+            storageBucket: "teknofest2026-54c0d.firebasestorage.app",
+            messagingSenderId: "605161918172",
+            appId: "1:605161918172:web:5a519822262d380ed86e19"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth();
+        const db = getDatabase();
+
+        const uyeEkle = async (kod) => {
+            const user = auth.currentUser;
+            const backupFoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName)}&background=6366f1&color=fff`;
+            
+            await update(ref(db, `evler/${kod}/uyeler/${user.uid}`), {
+                isim: user.displayName,
+                foto: user.photoURL || backupFoto
+            });
+            await update(ref(db, 'kullanicilar/' + user.uid), { kayitli_ev: kod });
+        };
+
+        window.evKur = async () => {
+            const kod = document.getElementById('joinCodeInput').value;
+            if(kod.length === 8) {
+                const check = await get(ref(db, `evler/${kod}`));
+                if(check.exists()) return alert("Bu ev zaten kurulu!");
+                
+                await set(ref(db, `evler/${kod}`), {
+                    sensorler: { sicaklik: 0, nem: 0 },
+                    sensorler_dis: { sicaklik: 0, nem: 0 },
+                    kontroller: { guvenlik: 0 }
+                });
+                await uyeEkle(kod);
+                window.location.href = "anasayfa.html";
+            } else { alert("Lütfen 8 haneli kod girin!"); }
+        };
+
+        window.eveKatil = async () => {
+            const kod = document.getElementById('joinCodeInput').value;
+            const check = await get(ref(db, `evler/${kod}`));
+            if(check.exists()) {
+                await uyeEkle(kod);
+                window.location.href = "anasayfa.html";
+            } else { alert("Ev bulunamadı!"); }
+        };
+
+        window.cikis = () => signOut(auth).then(() => window.location.href = "index.html");
+    </script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentria | Kontrol Paneli</title>
+    <link rel="stylesheet" href="anasayfa.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+</head>
+<body>
+
+    <main class="dashboard-container">
+        <nav class="top-nav">
+            <div class="profile-dropdown">
+                <div class="user-pill" onclick="toggleSettings()">
+                    <i class="bi bi-person-circle"></i>
+                    <span id="userName">Yükleniyor...</span>
+                    <i class="bi bi-chevron-down" style="font-size: 10px; margin-left: 5px;"></i>
+                </div>
+                <div id="settingsMenu" class="dropdown-content">
+                    <div class="menu-header">Hesap Ayarları</div>
+                    <a href="#"><i class="bi bi-gear"></i> Cihazı Yönet</a>
+                    <a href="#"><i class="bi bi-bell"></i> Bildirimler</a>
+                    <div class="menu-divider"></div>
+                    <button onclick="evdenAyril()" class="menu-leave-btn">
+                        <i class="bi bi-door-open"></i> Evden Ayrıl
+                    </button>
+                    <div class="menu-divider"></div>
+                    <button onclick="cikis()" class="menu-logout-btn">
+                        <i class="bi bi-box-arrow-right"></i> Oturumu Kapat
+                    </button>
+                </div>
+            </div>
+            <div class="status">
+                <span class="live-dot"></span> SİSTEM AKTİF
+            </div>
+        </nav>
+
+        <header class="device-card">
+            <small>ERİŞİM ANAHTARI</small>
+            <div id="kodBox" class="key-text">--------</div>
+        </header>
+
+        <h2 class="section-title">İÇ MEKAN</h2>
+        <section class="grid-layout">
+            <article class="sensor-card">
+                <label>SICAKLIK</label>
+                <div class="value-container">
+                    <div id="sicaklik" class="value">--°C</div>
+                    <i class="bi bi-thermometer-half icon-temp"></i>
+                </div>
+            </article>
+            <article class="sensor-card">
+                <label>NEM ORANI</label>
+                <div class="value-container">
+                    <div id="nem" class="value">--%</div>
+                    <i class="bi bi-droplets-fill icon-moisture"></i>
+                </div>
+            </article>
+        </section>
+
+        <h2 class="section-title">DIŞ MEKAN</h2>
+        <section class="grid-layout">
+            <article class="sensor-card out-card">
+                <label>DIŞ SICAKLIK</label>
+                <div class="value-container">
+                    <div id="sicaklikDis" class="value">--°C</div>
+                    <i class="bi bi-cloud-sun icon-temp"></i>
+                </div>
+            </article>
+            <article class="sensor-card out-card">
+                <label>DIŞ NEM</label>
+                <div class="value-container">
+                    <div id="nemDis" class="value">--%</div>
+                    <i class="bi bi-wind icon-moisture"></i>
+                </div>
+            </article>
+        </section>
+
+        <h2 class="section-title">EV ÜYELERİ</h2>
+        <section class="members-layout">
+            <div class="member-list" id="memberList">
+                </div>
+        </section>
+
+        <h2 class="section-title">SİSTEM KONTROLÜ</h2>
+        <section class="grid-layout">
+            <article class="control-card full-width">
+                <div class="text-group">
+                    <label>GÜVENLİK MODU</label>
+                    <div id="guvenlikMetin" class="status-text">Bağlanıyor...</div>
+                </div>
+                <button onclick="guvenlikDegistir()" id="guvenlikBtn" class="power-toggle">
+                    <i id="guvenlikIcon" class="bi bi-shield-slash"></i>
+                </button>
+            </article>
+        </section>
+
+        <footer class="dash-footer">
+            <div id="userMail" class="mail-info">...</div>
+            <button onclick="cikis()" class="btn-logout">Çıkış Yap</button>
+        </footer>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getDatabase, ref, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYjvyL6Bs-2Rm91mq1c6_WmHrZ-4GbZJU",
+            authDomain: "teknofest2026-54c0d.firebaseapp.com",
+            databaseURL: "https://teknofest2026-54c0d-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "teknofest2026-54c0d",
+            storageBucket: "teknofest2026-54c0d.firebasestorage.app",
+            messagingSenderId: "605161918172",
+            appId: "1:605161918172:web:5a519822262d380ed86e19"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth();
+        const db = getDatabase();
+        let evKod = null;
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                document.getElementById('userName').innerText = user.displayName || "Kullanıcı";
+                document.getElementById('userMail').innerText = user.email;
+                const snap = await get(ref(db, 'kullanicilar/' + user.uid));
+                if (snap.exists() && snap.val().kayitli_ev) {
+                    evKod = snap.val().kayitli_ev;
+                    verileriBaslat(evKod);
+                } else { window.location.href = "id.html"; }
+            } else { window.location.href = "index.html"; }
+        });
+
+        function verileriBaslat(kod) {
+            document.getElementById('kodBox').innerText = kod;
+            
+            // CANLI ÜYE LİSTESİ VE RESİM DÜZELTME
+            onValue(ref(db, `evler/${kod}/uyeler`), (snapshot) => {
+                const list = document.getElementById('memberList');
+                list.innerHTML = '';
+                snapshot.forEach((child) => {
+                    const u = child.val();
+                    const isSelf = child.key === auth.currentUser.uid;
+                    list.innerHTML += `
+                        <div class="member-item">
+                            <img src="${u.foto}" 
+                                 onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(u.isim)}&background=6366f1&color=fff'"
+                                 style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #6366f1;">
+                            <span>${u.isim} ${isSelf ? '(Sen)' : ''}</span>
+                        </div>`;
+                });
+                list.innerHTML += `<div class="add-member"><i class="bi bi-plus-lg"></i></div>`;
+            });
+
+            // Sensörler
+            onValue(ref(db, `evler/${kod}/sensorler`), (s) => {
+                const d = s.val();
+                document.getElementById('sicaklik').innerText = (d?.sicaklik ?? "--") + "°C";
+                document.getElementById('nem').innerText = (d?.nem ?? "--") + "%";
+            });
+
+            onValue(ref(db, `evler/${kod}/sensorler_dis`), (s) => {
+                const d = s.val();
+                document.getElementById('sicaklikDis').innerText = (d?.sicaklik ?? "--") + "°C";
+                document.getElementById('nemDis').innerText = (d?.nem ?? "--") + "%";
+            });
+
+            // Güvenlik
+            onValue(ref(db, `evler/${kod}/kontroller/guvenlik`), (s) => {
+                const durum = s.val();
+                const btn = document.getElementById('guvenlikBtn');
+                const metin = document.getElementById('guvenlikMetin');
+                const icon = document.getElementById('guvenlikIcon');
+                if(durum == 1) {
+                    btn.classList.add('active');
+                    metin.innerText = "GÜVENLİK AKTİF";
+                    metin.style.color = "#34c759";
+                    icon.className = "bi bi-shield-check";
+                } else {
+                    btn.classList.remove('active');
+                    metin.innerText = "SİSTEM DEVRE DIŞI";
+                    metin.style.color = "#86868b";
+                    icon.className = "bi bi-shield-slash";
+                }
+            });
+        }
+
+        window.guvenlikDegistir = () => {
+            if(!evKod) return;
+            const btn = document.getElementById('guvenlikBtn');
+            const yeniDurum = btn.classList.contains('active') ? 0 : 1;
+            update(ref(db, `evler/${evKod}/kontroller`), { guvenlik: yeniDurum });
+        };
+
+        window.evdenAyril = async () => {
+            if(confirm("Evden ayrılmak istiyor musunuz?")) {
+                await remove(ref(db, `evler/${evKod}/uyeler/${auth.currentUser.uid}`));
+                await update(ref(db, 'kullanicilar/' + auth.currentUser.uid), { kayitli_ev: null });
+                window.location.href = "id.html"; 
+            }
+        };
+
+        window.toggleSettings = () => document.getElementById('settingsMenu').classList.toggle('show');
+        window.cikis = () => signOut(auth).then(() => window.location.href = "index.html");
+    </script>
+</body>
+</html>
